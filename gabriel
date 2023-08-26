@@ -1,0 +1,1057 @@
+const qrcode = require('qrcode-terminal');
+const { Client } = require('whatsapp-web.js');
+const client = new Client();
+
+client.on('qr', qr => {
+    qrcode.generate(qr, {small: true});
+});
+
+client.on('ready', () => {
+    console.log('Whatsapp iniciado!');
+    main();
+});
+
+client.initialize();
+
+async function getGroupId(groupName) {
+    const chats = await client.getChats();
+    const groupChat = chats.find(chat => chat.isGroup && chat.name === groupName);
+    if (groupChat) {
+        return groupChat.id._serialized;
+    } else {
+        return null;
+    }
+}
+
+async function main() {
+    const groupName = 'ROBÔ CHOPP'; // Substitua pelo nome real do seu grupo
+    const groupId = await getGroupId(groupName);
+    if (groupId) {
+        console.log('ID do grupo:', groupId);
+    } else {
+        console.log('Grupo não encontrado');
+    }
+}
+
+const conversas = {};
+
+const GROUP_ID = '120363159325014028@g.us';
+
+const TEMPO_MINIMO_ENTRE_MENSAGENS = 12 * 60 * 1000; // 30 minutos em milissegundos
+
+const fs = require('fs');
+const { MessageMedia } = require('whatsapp-web.js');
+
+client.on('message', message => {
+    const agora = Date.now();
+    const conversa = conversas[message.from];
+
+    // Verifica se a mensagem recebida é o gatilho desejado (insensível a maiúsculas e minúsculas)
+    if (message.body && (message.body.toUpperCase() === 'INICIAR ATENDIMENTO' || 
+        (!conversa || !conversa.estado || agora - conversa.ultimaMensagem > TEMPO_MINIMO_ENTRE_MENSAGENS))) {
+        // Envia uma resposta ao usuário
+        client.sendMessage(message.from, 'Salve alcoolizado! Sou o Leão da Chopp e vou iniciar o seu atendimento.\n\n\n\nCaso deseje reiniciar o atendimento a qualquer momento, basta digitar INICIAR ATENDIMENTO.');
+        
+        // Armazena o nome do usuário em uma variável separada
+        const nome = conversa && conversa.nome;
+        
+        // Atualiza a variável conversas
+        conversas[message.from] = {};
+        
+        // Restaura o nome do usuário na variável conversas
+        if (nome) {
+            conversas[message.from].nome = nome;
+        }
+
+        if (conversa && conversa.nome) {
+            // O nome do usuário já está armazenado, envia as opções disponíveis
+            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n1) Plano de sócio.\n\n2) Compra de materiais.\n\n3) Falar com um atendente.\n`);
+            conversas[message.from].estado = 'NOME_DEFINIDO';
+        } else {
+            // O nome do usuário ainda não está armazenado, solicita que ele informe seu nome
+            client.sendMessage(message.from, 'Me fala o seu nome ou como gostaria de ser chamado por favor.');
+
+            // Atualiza o estado da conversa para aguardar o nome do usuário
+            if (!conversa) {
+                conversas[message.from] = {};
+            }
+            conversas[message.from].estado = 'AGUARDANDO_NOME';
+        }
+    } else {
+        // Atualiza a hora da última mensagem recebida
+        if (!conversa) {
+            conversas[message.from] = {};
+        }
+        conversas[message.from].ultimaMensagem = agora;
+
+        // Verifica se a conversa existe e se o estado é 'AGUARDANDO_NOME'
+        if (conversa && conversa.estado === 'AGUARDANDO_NOME') {
+            // Define o nome do usuário e atualiza o estado da conversa
+            conversa.nome = message.body;
+            conversa.estado = 'NOME_DEFINIDO';
+
+            // Envia uma resposta ao usuário com as opções disponíveis
+            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n1) Plano de sócio.\n\n2) Compra de materiais.\n\n3) Falar com um atendente.\n`);
+        } else if (conversa && conversa.estado === 'NOME_DEFINIDO') {
+            // Verifica qual opção o usuário selecionou
+            if (message.body === '1') {
+                // O usuário selecionou a opção 1
+                client.sendMessage(message.from, `Se liga ${conversa.nome}, estamos com o melhor plano de sócio do Brasil:\n\n1) Conheça nossos benefícios.\n\n2) Visualizar camisa de sócios.\n\n3) Formas de pagamento.\n\n4) Voltar ao atendimento.`);
+                conversas[message.from].estado = 'VISUALIZANDO_PLANO_SOCIO';
+
+            } else if (message.body === '2') {
+                // O usuário selecionou a opção 2   
+                client.sendMessage(message.from, `Então ${conversa.nome}, esses são os nossos materiais disponíveis para venda nesse momento:\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.`);
+                conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+
+
+            } else if (message.body === '3') {
+                // O usuário selecionou a opção 3
+                client.sendMessage(message.from, `Então ${conversa.nome}, estamos chamando um atendente.`);
+                client.sendMessage(GROUP_ID, `⚠Solicitação de atendimento.⚠\n\nNome: ${conversa.nome}\n Visualizando: Menu Inicial`);
+
+            } else if (message.body === '4') {
+                // O usuário selecionou a opção 4
+                client.sendMessage(message.from, `Então ${conversa.nome}, estamos chamando um atendente.`);
+                client.sendMessage(GROUP_ID, `⚠Solicitação de atendimento.⚠\n\nNome: ${conversa.nome}\n Visualizando: Menu Inicial`);
+            }
+        } else if (conversa && conversa.estado === 'VISUALIZANDO_PLANO_SOCIO') {
+            // Verifica qual opção o usuário selecionou
+            if (message.body === '1') {
+                // O usuário selecionou a opção 1 (BENEFICIOS)
+                client.sendMessage(message.from, `✅Camisa exclusiva.\n\n✅Carteira de sócio exclusiva.\n\n✅Grupo exclusivo de sócios com direito a opinar sobre todos os assuntos da torcida.\n\n✅Direito a voto na eleição bienal.\n\n✅Linha de produtos exclusivos.\n\n✅Descontos a partir de 10% em todos os materiais.\n\n✅Descontos a partir de 10% em todos os eventos e caravanas.\n\n✅Auxílio viagem no Campeonato Brasileiro 2023.*\n\n✅Sorteios Exclusivos.\n\n1) Contratar o plano.\n\n2) Voltar ao menu principal.`);
+                conversas[message.from].estado = 'VISUALIZANDO_CONHEÇA_NOSSOS_BENEFICIOS';
+        
+            } else if (message.body === '2') {
+                // O usuário selecionou a opção 2 (VISUALIZAR CAMISA DE SOCIOS)
+                // Carrega a imagem do arquivo
+                const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\CAMISA SÓCIO\\FOTO.jpg');
+                
+                // Envia a imagem para o usuário
+                client.sendMessage(message.from, image);
+                client.sendMessage(message.from, `Essa é a nossa camisa exclusiva para o sócio alcoolizado!\n\n1) Quero ser sócio!\n\n2) Voltar ao início.`);
+                conversas[message.from].estado = 'VISUALIZANDO_CAMISA_SOCIO';
+        
+            } else if (message.body === '3') {
+                // O usuário selecionou a opção 3 (FORMAS DE PAGAMENTO)
+                client.sendMessage(message.from, `No momento temos essas opções de pagamentos disponíveis:\n\n💳Cartão de crédito (via link de pagamento).\n\n💸Pix\n\n1) Quero ser sócio!\n\n2) Voltar ao início.`);
+                conversas[message.from].estado = 'VISUALIZANDO_FORMAS_DE_PAGAMENTO';
+        
+            } else if (message.body === '4') {
+                // O usuário selecionou a opção 4 (VOLTAR AO ATENDIMENTO)
+                client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n1) Plano de sócio.\n\n2) Compra de materiais.\n\n3) Falar com um atendente.\n`);
+                conversas[message.from].estado = 'NOME_DEFINIDO';
+            }
+        } else if (conversa && conversa.estado === 'VISUALIZANDO_CAMISA_SOCIO') {
+            if (message.body === '1') {
+                // O usuário digitou 1 para se tornar um sócio
+                client.sendMessage(message.from, `Legal ${conversa.nome}! Basta preencher nosso formulário e em breve retornaremos o contato para recebermos o pagamento...`);
+                client.sendMessage(message.from, `Formulário de Cadastro de Sócio: https://forms.gle/zKqz3VWGw86Y9mq68 `);
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou formulário para se associar🚨\n\nNome: ${conversa.nome}\n Visualizando: Camisa de Sócio`); 
+            } else if (message.body === '2') {
+                // O usuário digitou 2 para voltar ao menu principal do atendimento
+                client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n1) Plano de sócio.\n\n2) Compra de materiais.\n\n3) Falar com um atendente.\n`);
+                conversas[message.from].estado = 'NOME_DEFINIDO';
+            }
+        } else if (conversa && conversa.estado === 'VISUALIZANDO_CONHEÇA_NOSSOS_BENEFICIOS') {
+            if (message.body === '1') {
+                // O usuário digitou 1 para contratar o plano de sócio
+                client.sendMessage(message.from, `Legal ${conversa.nome}! Basta preencher nosso formulário e em breve retornaremos o contato para recebermos o pagamento...`);
+                client.sendMessage(message.from, `Formulário de Cadastro de Sócio: https://forms.gle/zKqz3VWGw86Y9mq68 `); 
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou formulário para se associar🚨\n\nNome: ${conversa.nome}\n Visualizando: Conheça nossos benefícios`);
+            } else if (message.body === '2') {
+                // O usuário digitou 2 para voltar ao menu principal do atendimento
+                client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n1) Plano de sócio.\n\n2) Compra de materiais.\n\n3) Falar com um atendente.\n`);
+                conversas[message.from].estado = 'NOME_DEFINIDO';
+            }
+        } else if (conversa && conversa.estado === 'VISUALIZANDO_FORMAS_DE_PAGAMENTO') {
+            if (message.body === '1') {
+                // O usuário digitou 1 para contratar o plano de sócio
+                client.sendMessage(message.from, `Legal ${conversa.nome}! Basta preencher nosso formulário e em breve retornaremos o contato para recebermos o pagamento...`);
+                client.sendMessage(message.from, `Formulário de Cadastro de Sócio: https://forms.gle/zKqz3VWGw86Y9mq68 `); 
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou formulário de cadastro de sócios🚨\n\nNome: ${conversa.nome}\n Visualizando: Formas de pagamento`);
+            } else if (message.body === '2') {
+                // O usuário digitou 2 para voltar ao menu principal do atendimento
+                client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n1) Plano de sócio.\n\n2) Compra de materiais.\n\n3) Falar com um atendente.\n`);
+                conversas[message.from].estado = 'NOME_DEFINIDO';
+            }
+        }
+        else if (conversa && conversa.estado === 'VISUALIZANDO_COMPRA_DE_MATERIAIS') {
+            if (message.body === '1') {
+                // O usuário selecionou a opção 1 (REGATA)
+                client.sendMessage(message.from, `No momento temos apenas um modelo de regata disponível.\n\nValor:\nSócio - R$20,00\nNão Sócio - R$25,00\n\nEstoque:\n\nP\nM\nG\nGG`);
+                client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar regata.\n\n2) Voltar a compra de materiais.\n`);
+                conversas[message.from].estado = 'VISUALIZANDO_REGATA';
+                
+                // Carrega a imagem do arquivo
+                const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\REGATA\\REGATA.jpg');
+                
+                // Envia a imagem para o usuário
+                client.sendMessage(message.from, image);
+            } else if (message.body === '2') {
+                // O usuário selecionou a opção 2 (CAMISA)
+                client.sendMessage(message.from, `No momento temos apenas um modelo de camisa disponível.\n\nValor:\nSócio - R$30,00\nNão Sócio - R$40,00\n\nEstoque:\n\nP\nM\nG\nGG\nEXG\nBalão`);
+                client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar camisa.\n\n2) Voltar a compra de materiais.\n`);
+                conversas[message.from].estado = 'VISUALIZANDO_CAMISA';
+                
+                // Carrega a imagem do arquivo
+                const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\CAMISA\\CAMISA.jpg');
+                
+                // Envia a imagem para o usuário
+                client.sendMessage(message.from, image);           
+          
+          
+            } else if (message.body === '3') {
+                // O usuário selecionou a opção 3 (BANDEIRA DE MÃO)
+                client.sendMessage(message.from, `Escolha o modelo que deseja ver:\n\n1) Bandeira Caneca.\n\n2) Bandeira Padrão.\n\n3) Bandeira Barril Ferminino\n\n4) Voltar ao menu principal.\n\nTamanhos:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_DE_MAO';
+            } else if (message.body === '4') {
+                // O usuário selecionou a opção 4 (FAIXA DE MÃO)
+                client.sendMessage(message.from, `Escolha o modelo que deseja ver:\n\n1) Chopp.\n\n2) Uma razão para viver.\n\n3) Futebol e cerveja.\n\n4) Joguem como bebemos.\n\n5) Barril feminino.\n\n6) Sport Chopp.\n\n7) TSC(Letra cinza).\n\n8) Desde 2006.\n\n9) Maior do nordeste.\n\n10) Sócio alcoolizado.\n\n11) Voltar aos materiais.\n\nTamanho único.`);
+                conversas[message.from].estado = 'VISUALIZANDO_FAIXA_DE_MAO';
+            } else if (message.body === '5') {
+                // O usuário selecionou a opção 5 (BONÉ)
+                client.sendMessage(message.from, `Escolha o modelo que deseja ver:\n\n1) Desde 2006.\n\n2) Leão.\n\n3) Tradicional.\n\n4) Modelo sócios.\n\n5) Bucket tradicional.\n\n6) Bucket barril feminino.\n\n7) Voltar aos materiais.`);
+                conversas[message.from].estado = 'VISUALIZANDO_BONE';
+            } else if (message.body === '6') {
+                // O usuário selecionou a opção 6 (COPOS)
+                client.sendMessage(message.from, `Escolha o modelo que deseja ver:\n\n1) Bandeirão.\n\n2) Logo.\n\n3) Tradicional.\n\n4) Barril Feminino.\n\n5) Voltar aos materiais.`);
+                conversas[message.from].estado = 'VISUALIZANDO_COPOS';
+            } else if (message.body === '7') {
+                // O usuário selecionou a opção 7 (NOVIDADES EM BREVE)
+                client.sendMessage(message.from, `Fica ligado que em breve te enviaremos as nossas novidades e você também pode acompanha-las pelo nosso instagram https://instagram.com/sportchopp?igshid=MzRlODBiNWFlZA== `);
+            } else if (message.body === '8') {
+                // O usuário selecionou a opção 8 (VOLTAR AO MENU PRINCIPAL)
+                client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n1) Plano de sócio.\n\n2) Compra de materiais.\n\n3) Falar com um atendente.\n`);
+                conversas[message.from].estado = 'NOME_DEFINIDO';
+            }
+        } else if (conversa && conversa.estado === 'VISUALIZANDO_REGATA') {
+            if (message.body === '1') {
+                // O usuário selecionou a opção 1 (COMPRAR REGATA)
+                client.sendMessage(message.from, `Para finalizar a compra, basta informar o tamanho e a quantidade desejada.`);
+                client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Regata.🚨\n\nNome: ${conversa.nome}\n Visualizando: REGATA PADRÃO`);
+            
+            } else if (message.body === '2') {
+                // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+            }
+        } else if (conversa && conversa.estado === 'VISUALIZANDO_CAMISA') {
+                if (message.body === '1') {
+                    // O usuário selecionou a opção 1 (COMPRAR CAMISA)
+                    client.sendMessage(message.from, `Para finalizar a compra, basta informar o tamanho e a quantidade desejada.`);
+                    client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                    client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Camisa.🚨\n\nNome: ${conversa.nome}\n Visualizando: CAMISA PADRÃO`);
+                
+                } else if (message.body === '2') {
+                    // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                    client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                }
+            } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_DE_MAO') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (BANDEIRA CANECA)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Caneca:\n\nValores:\n\nMédia:\nSócio - R$40,00\nNão Sócio - R$50,00\n\nPequena:\nSócio - R$20,00\nNão sócio - R$25,00:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_CANECA';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\CANECA.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (BANDEIRA PADRÃO)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Padrão:\n\nValores:\n\nMédia:\nSócio - R$40,00\nNão Sócio - R$50,00\n\nPequena:\nSócio - R$20,00\nNão sócio - R$25,00:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_PADRAO';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\PADRAO.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '3') {
+                        // O usuário selecionou a opção 3 (BANDEIRA BARRIL FEMININO)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Barril Feminino:\n\nValores:\n\nMédia:\nSócio - R$40,00\nNão Sócio - R$50,00\n\nPequena:\nSócio - R$20,00\nNão sócio - R$25,00:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_BARRIL';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\BARRIL.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '4') {
+                        // O usuário selecionou a opção 4 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    }
+                
+                } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_CANECA') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (COMPRAR BANDEIRA CANECA)
+                        client.sendMessage(message.from, `Para finalizar a compra, basta informar o tamanho e a quantidade desejada.`);
+                        client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                        client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Regata.🚨\n\nNome: ${conversa.nome}\n Visualizando: BANDEIRA DE MÃO CANECA`);
+                } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    } } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_DE_MAO') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (BANDEIRA CANECA)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Caneca:\n\nValores:\n\nMédia:\nSócio - R$40,00\nNão Sócio - R$50,00\n\nPequena:\nSócio - R$20,00\nNão sócio - R$25,00:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_CANECA';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\CANECA.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (BANDEIRA PADRÃO)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Padrão:\n\nValores:\n\nMédia:\nSócio - R$40,00\nNão Sócio - R$50,00\n\nPequena:\nSócio - R$20,00\nNão sócio - R$25,00:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_PADRAO';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\PADRAO.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '3') {
+                        // O usuário selecionou a opção 3 (BANDEIRA BARRIL FEMININO)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Barril Feminino:\n\nValor:\nSócio - R$15,00\nNão Sócio - R$20,00\n\nEstoque:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_BARRIL';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\BARRIL.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '4') {
+                        // O usuário selecionou a opção 4 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    }
+                
+                    //BANDEIRA CANECA
+                } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_CANECA') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (COMPRAR BANDEIRA CANECA)
+                        client.sendMessage(message.from, `Para finalizar a compra, basta informar o tamanho e a quantidade desejada.`);
+                        client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                        client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Regata.🚨\n\nNome: ${conversa.nome}\n Visualizando: BANDEIRA DE MÃO CANECA`);
+                } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    }
+
+              //BANDEIRA PADRÃO
+                } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_PADRAO') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (COMPRAR BANDEIRA PADRAO)
+                client.sendMessage(message.from, `Para finalizar a compra, basta informar o tamanho e a quantidade desejada.`);
+                client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Regata.🚨\n\nNome: ${conversa.nome}\n Visualizando: BANDEIRA DE MÃO PADRÃO`);
+                } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    } 
+        
+              //BANDEIRA BARRIL
+            } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_BARRIL') {
+                if (message.body === '1') {
+                    // O usuário selecionou a opção 1 (COMPRAR BANDEIRA BARRIL)
+                client.sendMessage(message.from, `Para finalizar a compra, basta informar o tamanho e a quantidade desejada.`);
+                client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Regata.🚨\n\nNome: ${conversa.nome}\n Visualizando: BANDEIRA DE MÃO BARRIL`);
+            } else if (message.body === '2') {
+                    // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                    client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                } 
+            } else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_DE_MAO') {
+                if (message.body === '1') {
+                    // O usuário selecionou a opção 1 (CHOPP)
+                    client.sendMessage(message.from, `Informações sobre a Faixa de mão:\n\nValores:\n\nSócio - R$5,00\nNão sócio - R$6,00:`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar faixa.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_FAIXA_CHOPP';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\FAIXAS\\CHOPP.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+                } else if (message.body === '2') {
+                    // O usuário selecionou a opção 2 (UMA)
+                    client.sendMessage(message.from, `Informações sobre a Faixa de mão:\n\nValores:\n\nSócio - R$5,00\nNão sócio - R$6,00:`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar faixa.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_FAIXA_UMA';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\FAIXAS\\UMA.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+                } else if (message.body === '3') {
+                    // O usuário selecionou a opção 3 (FUT)
+                    client.sendMessage(message.from, `Informações sobre a Faixa de mão:\n\nValores:\n\nSócio - R$5,00\nNão sócio - R$6,00:`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar faixa.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_FAIXA_FUT';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\FAIXAS\\FUT.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+                } else if (message.body === '4') {
+                    // O usuário selecionou a opção 4 (JOGUEM)
+                    client.sendMessage(message.from, `Informações sobre a Faixa de mão:\n\nValores:\n\nSócio - R$5,00\nNão sócio - R$6,00:`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar faixa.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_FAIXA_JOGUEM';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\FAIXAS\\JOGUEM.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+                } else if (message.body === '5') {
+                    // O usuário selecionou a opção 5 (BARRIL)
+                    client.sendMessage(message.from, `Informações sobre a Faixa de mão:\n\nValores:\n\nSócio - R$5,00\nNão sócio - R$6,00:`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar faixa.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_FAIXA_BARRIL';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\FAIXAS\\BARRIL.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+
+                } else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_DE_MAO') {
+                    if (message.body === '6') {
+                        // O usuário selecionou a opção 6 (SPORT)
+                        client.sendMessage(message.from, `Informações sobre a Faixa de mão:\n\nValores:\n\nSócio - R$5,00\nNão sócio - R$6,00:`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar faixa.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_FAIXA_SPORT';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\FAIXAS\\SPORT.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    } else if (message.body === '7') {
+                        // O usuário selecionou a opção 7 (TSC)
+                        client.sendMessage(message.from, `Informações sobre a Faixa de mão:\n\nValores:\n\nSócio - R$5,00\nNão sócio - R$6,00:`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar faixa.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_FAIXA_TSC';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\FAIXAS\\TSC.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    } else if (message.body === '8') {
+                        // O usuário selecionou a opção 8 (DESDE)
+                        client.sendMessage(message.from, `Informações sobre a Faixa de mão:\n\nValores:\n\nSócio - R$5,00\nNão sócio - R$6,00:`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar faixa.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_FAIXA_DESDE';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\FAIXAS\\DESDE.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    } else if (message.body === '9') {
+                        // O usuário selecionou a opção 9 (MAIOR)
+                        client.sendMessage(message.from, `Informações sobre a Faixa de mão:\n\nValores:\n\nSócio - R$5,00\nNão sócio - R$6,00:`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar faixa.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_FAIXA_MAIOR';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\FAIXAS\\MAIOR.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    } else if (message.body === '10') {
+                        // O usuário selecionou a opção 10 (SOCIO)
+                        client.sendMessage(message.from, `Informações sobre a Faixa de mão:\n\nValores:\n\nSócio - R$5,00\nNão sócio - R$6,00:`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar faixa.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_FAIXA_SOCIO';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\FAIXAS\\SOCIO.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                        
+                    } else if (message.body === '11') {
+                        // O usuário selecionou a opção 11 (VOLTAR A COMPRA DE MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    }
+    }
+
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_CHOPP') {
+                        if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (COMPRAR FAIXA DE MÃO)
+                        client.sendMessage(message.from, `Para finalizar a compra, basta informar os modelos e a quantidade desejada.`);
+                        client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                        client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Faixa de mão.🚨\n\nNome: ${conversa.nome}\n Visualizando: FAIXA DE MÃO`);
+                    } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+    }
+}
+                    else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_UMA') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (COMPRAR FAIXA DE MÃO)
+                        client.sendMessage(message.from, `Para finalizar a compra, basta informar os modelos e a quantidade desejada.`);
+                        client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                        client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Faixa de mão.🚨\n\nNome: ${conversa.nome}\n Visualizando: FAIXA DE MÃO`);
+                    } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    }
+}
+                     else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_FUT') {
+                        if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR FAIXA DE MÃO)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar os modelos e a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Faixa de mão.🚨\n\nNome: ${conversa.nome}\n Visualizando: FAIXA DE MÃO`);
+                        } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                        }
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_JOGUEM') {
+                        if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR FAIXA DE MÃO)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar os modelos e a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Faixa de mão.🚨\n\nNome: ${conversa.nome}\n Visualizando: FAIXA DE MÃO`);
+                        } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                        }
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_BARRIL') {
+                        if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR FAIXA DE MÃO)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar os modelos e a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Faixa de mão.🚨\n\nNome: ${conversa.nome}\n Visualizando: FAIXA DE MÃO`);
+                        } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                        }
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_SPORT') {
+                        if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR FAIXA DE MÃO)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar os modelos e a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Faixa de mão.🚨\n\nNome: ${conversa.nome}\n Visualizando: FAIXA DE MÃO`);
+                        } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                        }
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_TSC') {
+                        if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR FAIXA DE MÃO)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar os modelos e a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Faixa de mão.🚨\n\nNome: ${conversa.nome}\n Visualizando: FAIXA DE MÃO`);
+                        } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                        }
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_DESDE') {
+                        if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR FAIXA DE MÃO)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar os modelos e a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Faixa de mão.🚨\n\nNome: ${conversa.nome}\n Visualizando: FAIXA DE MÃO`);
+                        } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                        }
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_MAIOR') {
+                        if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR FAIXA DE MÃO)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar os modelos e a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Faixa de mão.🚨\n\nNome: ${conversa.nome}\n Visualizando: FAIXA DE MÃO`);
+                        } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                        }
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_FAIXA_SOCIO') {
+                        if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR FAIXA DE MÃO)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar os modelos e a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Faixa de mão.🚨\n\nNome: ${conversa.nome}\n Visualizando: FAIXA DE MÃO`);
+                        } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR A COMPRA DE MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                        }
+                            } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_DE_MAO') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (BANDEIRA CANECA)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Caneca:\n\nValores:\n\nMédia:\nSócio - R$40,00\nNão Sócio - R$50,00\n\nPequena:\nSócio - R$20,00\nNão sócio - R$25,00:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_CANECA';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\CANECA.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (BANDEIRA PADRÃO)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Padrão:\n\nValores:\n\nMédia:\nSócio - R$40,00\nNão Sócio - R$50,00\n\nPequena:\nSócio - R$20,00\nNão sócio - R$25,00:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_PADRAO';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\PADRAO.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '3') {
+                        // O usuário selecionou a opção 3 (BANDEIRA BARRIL FEMININO)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Barril Feminino:\n\nValores:\n\nMédia:\nSócio - R$40,00\nNão Sócio - R$50,00\n\nPequena:\nSócio - R$20,00\nNão sócio - R$25,00:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_BARRIL';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\BARRIL.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '4') {
+                        // O usuário selecionou a opção 4 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    }
+                
+                } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_CANECA') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (COMPRAR BANDEIRA CANECA)
+                        client.sendMessage(message.from, `Para finalizar a compra, basta informar o tamanho e a quantidade desejada.`);
+                        client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                        client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Regata.🚨\n\nNome: ${conversa.nome}\n Visualizando: BANDEIRA DE MÃO CANECA`);
+                } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    } } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_DE_MAO') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (BANDEIRA CANECA)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Caneca:\n\nValores:\n\nMédia:\nSócio - R$40,00\nNão Sócio - R$50,00\n\nPequena:\nSócio - R$20,00\nNão sócio - R$25,00:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_CANECA';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\CANECA.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (BANDEIRA PADRÃO)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Padrão:\n\nValores:\n\nMédia:\nSócio - R$40,00\nNão Sócio - R$50,00\n\nPequena:\nSócio - R$20,00\nNão sócio - R$25,00:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_PADRAO';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\PADRAO.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '3') {
+                        // O usuário selecionou a opção 3 (BANDEIRA BARRIL FEMININO)
+                        client.sendMessage(message.from, `Informações sobre a Bandeira Barril Feminino:\n\nValor:\nSócio - R$15,00\nNão Sócio - R$20,00\n\nEstoque:\n\nMédia (1,05 x 1,45m)\nPequena (0,72m x 1,05m)`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bandeira.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_BANDEIRA_BARRIL';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BANDEIRAS\\BARRIL.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '4') {
+                        // O usuário selecionou a opção 4 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    }
+                
+                    //BANDEIRA CANECA
+                } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_CANECA') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (COMPRAR BANDEIRA CANECA)
+                        client.sendMessage(message.from, `Para finalizar a compra, basta informar o tamanho e a quantidade desejada.`);
+                        client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                        client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Regata.🚨\n\nNome: ${conversa.nome}\n Visualizando: BANDEIRA DE MÃO CANECA`);
+                } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    }
+
+              //BANDEIRA PADRÃO
+                } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_PADRAO') {
+                    if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (COMPRAR BANDEIRA PADRAO)
+                client.sendMessage(message.from, `Para finalizar a compra, basta informar o tamanho e a quantidade desejada.`);
+                client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Regata.🚨\n\nNome: ${conversa.nome}\n Visualizando: BANDEIRA DE MÃO PADRÃO`);
+                } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                    } 
+        
+              //BANDEIRA BARRIL
+            } else if (conversa && conversa.estado === 'VISUALIZANDO_BANDEIRA_BARRIL') {
+                if (message.body === '1') {
+                    // O usuário selecionou a opção 1 (COMPRAR BANDEIRA BARRIL)
+                client.sendMessage(message.from, `Para finalizar a compra, basta informar o tamanho e a quantidade desejada.`);
+                client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Regata.🚨\n\nNome: ${conversa.nome}\n Visualizando: BANDEIRA DE MÃO BARRIL`);
+            } else if (message.body === '2') {
+                    // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                    client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                } 
+            } else if (conversa && conversa.estado === 'VISUALIZANDO_BONE') {
+                if (message.body === '1') {
+                    // O usuário selecionou a opção 1 (DESDE 2006)
+                    client.sendMessage(message.from, `Informações sobre o Boné Desde 2006:\n\nValor:\n\nSócio - R$49,90\nNão Sócio - R$59,90`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar boné.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_BONE_2006';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BONE\\DESDE.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+                
+                } else if (message.body === '2') {
+                    // O usuário selecionou a opção 2 (LEÃO)
+                    client.sendMessage(message.from, `Informações sobre o Boné Leão:\n\nValor:\n\nSócio - R$49,90\nNão Sócio - R$59,90`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar boné.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_BONE_LEAO';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BONE\\LEAO.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+                
+                } else if (message.body === '3') {
+                    // O usuário selecionou a opção 3 (BONÉ TRADICIONAL)
+                    client.sendMessage(message.from, `Informações sobre o Boné Tradicional:\n\nValor:\n\nSócio - R$49,90\nNão Sócio - R$59,90`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar boné.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_BONE_TRADICIONAL';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BONE\\TRADICIONAL.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+
+                } else if (message.body === '4') {
+                    // O usuário selecionou a opção 4 (BONÉ SÓCIOS)
+                    client.sendMessage(message.from, `Informações sobre o Boné de sócios:\n\nValor: R$39,90\n\n*Venda exclusiva para sócios.*`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar boné.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_BONE_SOCIOS';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BONE\\SOCIOS.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+
+                } else if (message.body === '5') {
+                    // O usuário selecionou a opção 5 (BUCKET TRADICIONAL)
+                    client.sendMessage(message.from, `Informações sobre o Bucket tradicional:\n\nValor:\n\nSócio - R$49,90\nNão Sócio - R$59,90`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bucket.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_BUCKET1';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BONE\\BUCKET1.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+
+                } else if (message.body === '6') {
+                    // O usuário selecionou a opção 6 (BUCKET BARRIL)
+                    client.sendMessage(message.from, `Informações sobre o Bucket barril feminino:\n\nValor:\n\nSócio - R$49,90\nNão Sócio - R$59,90`);
+                    client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar bucket.\n\n2) Voltar a compra de materiais.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_BUCKET2';
+                    
+                    // Carrega a imagem do arquivo
+                    const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\BONE\\BUCKET2.jpg');
+                    
+                    // Envia a imagem para o usuário
+                    client.sendMessage(message.from, image); 
+
+                
+                } else if (message.body === '7') {
+                    // O usuário selecionou a opção 7 (VOLTAR AOS MATERIAIS)
+                    client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                }
+
+          //BONÉ DESDE 2006
+            } else if (conversa && conversa.estado === 'VISUALIZANDO_BONE_2006') {
+                if (message.body === '1') {
+                    // O usuário selecionou a opção 1 (COMPRAR BONÉ 2006)
+                    client.sendMessage(message.from, `Para finalizar a compra, basta informar a quantidade desejada.`);
+                    client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                    client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Boné.🚨\n\nNome: ${conversa.nome}\n Visualizando: BONÉ DESDE 2006`);
+            } else if (message.body === '2') {
+                    // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                    client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                }
+
+          //BONÉ LEÃO
+            } else if (conversa && conversa.estado === 'VISUALIZANDO_BONE_LEAO') {
+                if (message.body === '1') {
+                    // O usuário selecionou a opção 1 (COMPRAR BONÉ LEÃO)
+                    client.sendMessage(message.from, `Para finalizar a compra, basta informar a quantidade desejada.`);
+                    client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                    client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Boné.🚨\n\nNome: ${conversa.nome}\n Visualizando: BONÉ LEÃO`);
+            } else if (message.body === '2') {
+                    // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                    client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                    conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+                } 
+    
+          //BONÉ TRADICIONAL
+        } else if (conversa && conversa.estado === 'VISUALIZANDO_BONE_TRADICIONAL') {
+            if (message.body === '1') {
+                // O usuário selecionou a opção 1 (COMPRAR BONÉ TRADICIONAL)
+                client.sendMessage(message.from, `Para finalizar a compra, basta informar a quantidade desejada.`);
+                client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Boné.🚨\n\nNome: ${conversa.nome}\n Visualizando: BONÉ TRADICIONAL`);
+        } else if (message.body === '2') {
+                // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+            }         
+          //BONÉ SÓCIOS
+        } else if (conversa && conversa.estado === 'VISUALIZANDO_BONE_SOCIOS') {
+            if (message.body === '1') {
+                // O usuário selecionou a opção 1 (COMPRAR BONÉ SÓCIOS)
+                client.sendMessage(message.from, `Para finalizar a compra, basta informar a quantidade desejada.`);
+                client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Boné.🚨\n\nNome: ${conversa.nome}\n Visualizando: BONÉ SÓCIOS`);
+        } else if (message.body === '2') {
+                // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+            }
+
+          //BUCKET TRADICIONAL
+        } else if (conversa && conversa.estado === 'VISUALIZANDO_BUCKET1') {
+            if (message.body === '1') {
+                // O usuário selecionou a opção 1 (COMPRAR BUCKET TRADICIONAL)
+                client.sendMessage(message.from, `Para finalizar a compra, basta informar a quantidade desejada.`);
+                client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Boné.🚨\n\nNome: ${conversa.nome}\n Visualizando: BUCKET TRADICIONAL`);
+        } else if (message.body === '2') {
+                // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+            } 
+
+          //BUCKET BARRIL
+        } else if (conversa && conversa.estado === 'VISUALIZANDO_BUCKET2') {
+            if (message.body === '1') {
+                // O usuário selecionou a opção 1 (COMPRAR BUCKET TRADICIONAL)
+                client.sendMessage(message.from, `Para finalizar a compra, basta informar a quantidade desejada.`);
+                client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de Boné.🚨\n\nNome: ${conversa.nome}\n Visualizando: BUCKET BARRIL`);
+    } else if (message.body === '2') {
+            // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+        }         
+                
+    } else if (conversa && conversa.estado === 'VISUALIZANDO_COPOS') {
+            if (message.body === '1') {
+                        // O usuário selecionou a opção 1 (COPO 1)
+                        client.sendMessage(message.from, `Informações sobre o Copo:\n\nTamanho: 500ml\n\nValor:\n\nSócio - R$10,00\nNão Sócio - R$12,00`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar copo.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COPO1';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\COPOS\\COPO1.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '2') {
+                        // O usuário selecionou a opção 2 (COPO 2)
+                        client.sendMessage(message.from, `Informações sobre o Copo:\n\nTamanho: 500ml\n\nValor:\n\nSócio - R$10,00\nNão Sócio - R$12,00`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar copo.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COPO2';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\COPOS\\COPO2.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+                    
+                    } else if (message.body === '3') {
+                        // O usuário selecionou a opção 3 (COPO 3)
+                        client.sendMessage(message.from, `Informações sobre o Copo:\n\nTamanho: 500ml\n\nValor:\n\nSócio - R$10,00\nNão Sócio - R$12,00`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar copo.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COPO3';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\COPOS\\COPO3.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image); 
+    
+                    } else if (message.body === '4') {
+                        // O usuário selecionou a opção 4 (COPO 4)
+                        client.sendMessage(message.from, `Informações sobre o Copo:\n\nTamanho: 500ml\n\nValor:\n\nSócio - R$10,00\nNão Sócio - R$12,00`);
+                        client.sendMessage(message.from, `Escolha uma das opções:\n\n1) Comprar copo.\n\n2) Voltar a compra de materiais.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COPO4';
+                        
+                        // Carrega a imagem do arquivo
+                        const image = MessageMedia.fromFilePath('C:\\Users\\SportChopp06\\Desktop\\ZONA DE TESTES\\IMAGENS\\COPOS\\COPO4.jpg');
+                        
+                        // Envia a imagem para o usuário
+                        client.sendMessage(message.from, image);                     
+            
+                    } else if (message.body === '5') {
+                        // O usuário selecionou a opção 5 (VOLTAR AOS MATERIAIS)
+                        client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                        conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';                        
+            //COPO 1
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_COPO1') {
+                            if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR COPO1)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de COPO.🚨\n\nNome: ${conversa.nome}\n Visualizando: COPOS`);
+                    } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+        }
+
+            //COPO 2
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_COPO2') {
+                            if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR COPO2)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de COPO.🚨\n\nNome: ${conversa.nome}\n Visualizando: COPOS`);
+                    } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+        } 
+
+            //COPO 3
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_COPO3') {
+                            if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR COPO3)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de COPO.🚨\n\nNome: ${conversa.nome}\n Visualizando: COPOS`);
+                    } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+    }         
+            //COPO 4
+                    } else if (conversa && conversa.estado === 'VISUALIZANDO_COPO4') {
+                            if (message.body === '1') {
+                            // O usuário selecionou a opção 1 (COMPRAR COPO4)
+                            client.sendMessage(message.from, `Para finalizar a compra, basta informar a quantidade desejada.`);
+                            client.sendMessage(message.from, `Em breve, um de nossos atendentes finalizará o seu pedido acertando a retirada e/ou envio. Foi um prazer te atender, obrigado por fazer parte da maior chopp do nordeste! 🦁🍺🤙`);
+                            client.sendMessage(GROUP_ID, `🚨Usuário solicitou compra de COPO.🚨\n\nNome: ${conversa.nome}\n Visualizando: COPOS`);
+                    } else if (message.body === '2') {
+                            // O usuário selecionou a opção 2 (VOLTAR AOS MATERIAIS)
+                            client.sendMessage(message.from, `Beleza ${conversa.nome}, agora me fala o que você deseja:\n\n\n\n1) Regata.\n\n2) Camisa.\n\n3) Bandeira de mão.\n\n4) Faixa de mão.\n\n5) Boné.\n\n6) Copos.\n\n7) Novidades em breve.\n\n8) Voltar ao menu principal.\n`);
+                            conversas[message.from].estado = 'VISUALIZANDO_COMPRA_DE_MATERIAIS';
+    }
+
+
+
+
+ 
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+        
+        
+            }
+        
+    
+    
+
+
+
+
+        }}})
